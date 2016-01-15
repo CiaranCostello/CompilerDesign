@@ -1,0 +1,20 @@
+// This is a test program which can be compiled by the TastierCompiler.
+// It reads a sequence of numbers from the input file and computes, for each
+// number, the sum of all integers up to that number
+
+program Test {
+
+  void Main() {
+    switch (1) {
+    	case 1:
+    		write 1;
+    		write "string";
+    	case 2:
+    		write 2;
+    	case 5:
+    		write 5;
+    	case 6:
+    		write 6;
+    }
+  }
+}

@@ -1,0 +1,13 @@
+// This is a test program which can be compiled by the TastierCompiler.
+// It reads a sequence of numbers from the input file and computes, for each
+// number, the sum of all integers up to that number
+
+program Test {
+	string r;
+
+  	void Main() {
+  		r := (true)?"hello":"who knows";
+		write r;
+  	}
+}
+

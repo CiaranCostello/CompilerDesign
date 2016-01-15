@@ -79,8 +79,9 @@ COMPILER Tastier
                       Item4, -1 if procedure
     * Symbol.Item6 -> if the variable is a string then it's length is
                       stored here, otherwise it's value is -1
-    * Symbol.Item7 -> if the symbol is an array then the depth of the array 
-                      is stored here. 1-D array
+    * Symbol.Item7 -> if the symbol is an variable then the depth of the array 
+                      is stored here. Normal variable has array depth 0. 
+                      Procedures have arrayDepth of -1
 */
 
   class Scope : Stack<Symbol> {}
@@ -462,7 +463,7 @@ MulOp<out Instruction inst>
 ProcDecl                        (.  string name; string label; Scope currentScope = openScopes.Peek(); int enterInstLocation = 0; bool external = false; .)
 = "void"
   Ident<out name>               (.
-  									temp = new Symbol(name, (int)TastierKind.Proc, (int)TastierType.Undefined, openScopes.Count, -1, -1); 
+  									temp = new Symbol(name, (int)TastierKind.Proc, (int)TastierType.Undefined, openScopes.Count, -1, -1, -1); 
   									// print out information on the symbol
   									printSymbol(temp);
                                     currentScope.Push(temp);
@@ -565,7 +566,7 @@ Stat                            (.  TastierType type; string name; Symbol sym; b
                                         // Print out enough stores for the string that has been assigned to the variable
                                         // Store pointer to the string at the address of the string symbol
                                         int newAddress = globalScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString - lastStringLength;
-                                        sym = new Symbol(sym.Item1, sym.Item2, sym.Item3, sym.Item4, newAddress, lastStringLength);
+                                        sym = new Symbol(sym.Item1, sym.Item2, sym.Item3, sym.Item4, newAddress, lastStringLength, sym.Item7);
                                         findScope(openScopes, sym.Item1).Push(sym);
                                         for(int i = 0; i < lastStringLength; i++) {
                                           program.Add(new Instruction("", "StoG "+ (sym.Item5 + 3 + i)));
@@ -872,28 +873,31 @@ Term<out TastierType type>      (.  TastierType type1; Instruction inst; .)
 
 /*------------------------------------------------------------------------*/
 
-Type<out TastierType type>
+Type<out TastierType type, out int arrayDepth> (. arrayDepth = 0; .)
 =                               (.  type = TastierType.Undefined; .)
  ( "int"                        (.  type = TastierType.Integer; .)
  | "bool"                       (.  type = TastierType.Boolean; .)
  | "string"                     (.  type = TastierType.String;  .)
- ).
+ )
+ {"[]"                          (.  arrayDepth += 1;  .)                  // multidimensional arrays allowed, 0 or more dimensions
+ }
+ .
 
 /*------------------------------------------------------------------------*/
 
 ConstDecl<bool external>        (.
                                     string name; TastierType type; TastierType type1; Scope currentScope = openScopes.Peek();
                                 .)
- = "const" Type<out type>
+ = "const" Type<out type, out arrayDepth>
   Ident<out name>               (.
                                     if (external) {
                                       temp = new Symbol(name, (int)TastierKind.Const, (int)type, 0, 0, -1);
                                       externalDeclarations.Push(temp);
                                     } else {
                                       if(openScopes.Count()-1 == 0)
-                                        temp = new Symbol(name, (int)TastierKind.Const, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1);
+                                        temp = new Symbol(name, (int)TastierKind.Const, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1, arrayDepth);
                                       else
-                                        temp = new Symbol(name, (int)TastierKind.Const, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1);
+                                        temp = new Symbol(name, (int)TastierKind.Const, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1, arrayDepth);
                                       currentScope.Push(temp);
                                     }
                                     printSymbol(temp);
@@ -934,16 +938,16 @@ ConstDecl<bool external>        (.
 VarDecl<bool external>          (.
                                     string name; TastierType type; Scope currentScope = openScopes.Peek();
                                 .)
-= Type<out type>
+= Type<out type, out arrayDepth>
   Ident<out name>               (.
                                     if (external) {
                                       temp = new Symbol(name, (int)TastierKind.Var, (int)type, 0, 0, -1);
                                       externalDeclarations.Push(temp);
                                     } else {
                                       if(openScopes.Count()-1 == 0)
-                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1);
+                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1, arrayDepth);
                                       else
-                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1);
+                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1, arrayDepth);
                                       currentScope.Push(temp);
                                     }
                                     printSymbol(temp);
@@ -954,9 +958,9 @@ VarDecl<bool external>          (.
                                       externalDeclarations.Push(temp);
                                     } else {
                                       if(openScopes.Count()-1 == 0)
-                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1);
+                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc && s.Item3 != (int)TastierType.String) + totalString, -1, arrayDepth);
                                       else
-                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1);
+                                        temp = new Symbol(name, (int)TastierKind.Var, (int)type, openScopes.Count-1, currentScope.Count(s => s.Item2 != (int)TastierKind.Proc), -1, arrayDepth);
                                       currentScope.Push(temp);
                                     }
                                     printSymbol(temp);
